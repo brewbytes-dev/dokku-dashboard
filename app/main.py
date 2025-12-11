@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.auth import get_current_user
 from app.config import get_settings
-from app.routers import apps, config, logs
+from app.routers import apps, config, logs, system, plugins
 
 # Create FastAPI app
 app = FastAPI(
@@ -33,6 +33,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(apps.router)
 app.include_router(logs.router)
 app.include_router(config.router)
+app.include_router(system.router)
+app.include_router(plugins.router)
 
 # Templates
 templates = Jinja2Templates(directory="app/templates")

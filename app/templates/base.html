@@ -73,6 +73,12 @@
                     <a href="/apps" class="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
                         Apps
                     </a>
+                    <a href="/system" class="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                        System
+                    </a>
+                    <a href="/plugins" class="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                        Plugins
+                    </a>
                     {% if request.state.user %}
                     <div class="flex items-center space-x-2 text-slate-300">
                         <span class="text-sm">{{ request.state.user.email }}</span>
@@ -96,6 +102,31 @@
     <!-- Toast container -->
     <div id="toast-container" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
 
+    <!-- Modal container -->
+    <div id="modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl max-w-md w-full transform transition-all" onclick="event.stopPropagation()">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 id="modal-title" class="text-xl font-bold text-white"></h3>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-white transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <p id="modal-message" class="text-slate-300 mb-6"></p>
+                <div class="flex space-x-3">
+                    <button id="modal-cancel" onclick="closeModal()" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="modal-confirm" class="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Toast notification helper
         function showToast(message, type = 'success') {
@@ -111,6 +142,33 @@
             container.appendChild(toast);
             setTimeout(() => toast.remove(), 3000);
         }
+
+        // Modal helper
+        function showModal(title, message, onConfirm) {
+            const modal = document.getElementById('modal');
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('modal-confirm').onclick = () => {
+                closeModal();
+                onConfirm();
+            };
+            modal.classList.remove('hidden');
+            modal.onclick = closeModal;
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+        }
+
+        // Override HTMX confirm with custom modal
+        document.body.addEventListener('htmx:confirm', function(evt) {
+            evt.preventDefault();
+            const target = evt.detail.target;
+            const message = target.getAttribute('hx-confirm');
+            if (message) {
+                showModal('Confirm Action', message, () => evt.detail.issueRequest());
+            }
+        });
 
         // Listen for HTMX events
         document.body.addEventListener('htmx:afterRequest', function(evt) {
