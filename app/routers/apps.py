@@ -83,27 +83,38 @@ async def start_app(request: Request, app_name: str):
 @router.post("/{app_name}/stop", response_class=HTMLResponse)
 async def stop_app(request: Request, app_name: str):
     """Stop an app."""
-    client = DokkuClient()
-    await client.app_stop(app_name)
+    import logging
+    logger = logging.getLogger(__name__)
     
-    import asyncio
-    app, ssl_status = await asyncio.gather(
-        client.app_info(app_name),
-        client.get_app_ssl_status(app_name),
-    )
-    
-    # Check if called from detail page or list page
-    target = request.headers.get("hx-target", "")
-    if target == "#app-status":
-        return templates.TemplateResponse(
-            "components/app_status.html",
-            {"request": request, "app": app, "ssl": ssl_status},
+    try:
+        logger.info(f"Stopping app: {app_name}")
+        client = DokkuClient()
+        result = await client.app_stop(app_name)
+        logger.info(f"Stop result: {result}")
+        
+        import asyncio
+        app, ssl_status = await asyncio.gather(
+            client.app_info(app_name),
+            client.get_app_ssl_status(app_name),
         )
-    else:
-        return templates.TemplateResponse(
-            "components/app_card.html",
-            {"request": request, "app": app},
-        )
+        
+        # Check if called from detail page or list page
+        target = request.headers.get("hx-target", "")
+        logger.info(f"Target: {target}")
+        
+        if target == "#app-status":
+            return templates.TemplateResponse(
+                "components/app_status.html",
+                {"request": request, "app": app, "ssl": ssl_status},
+            )
+        else:
+            return templates.TemplateResponse(
+                "components/app_card.html",
+                {"request": request, "app": app},
+            )
+    except Exception as e:
+        logger.error(f"Error stopping app {app_name}: {e}", exc_info=True)
+        raise
 
 
 @router.post("/{app_name}/restart", response_class=HTMLResponse)
