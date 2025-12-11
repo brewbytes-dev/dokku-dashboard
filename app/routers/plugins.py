@@ -12,33 +12,45 @@ templates = Jinja2Templates(directory="app/templates")
 async def list_plugins(request: Request):
     """List installed Dokku plugins."""
     import asyncio
-    
-    # Get list of plugins
-    proc = await asyncio.create_subprocess_exec(
-        "dokku", "plugin:list",
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-    stdout, _ = await proc.communicate()
+    import os
     
     plugins = []
-    for line in stdout.decode().strip().split("\n"):
-        line = line.strip()
-        if not line or line.startswith("===") or line.startswith("----"):
-            continue
-        
-        # Parse plugin line format: "plugin-name version description"
-        parts = line.split(maxsplit=2)
-        if len(parts) >= 2:
-            plugin = {
-                "name": parts[0],
-                "version": parts[1],
-                "description": parts[2] if len(parts) > 2 else "",
-            }
-            
-            # Get apps using this plugin
-            plugin["apps"] = await _get_plugin_apps(parts[0])
-            plugins.append(plugin)
+    
+    # Read plugins from filesystem (more reliable than dokku command)
+    plugin_dir = "/var/lib/dokku/plugins/enabled"
+    try:
+        if os.path.exists(plugin_dir):
+            for plugin_name in sorted(os.listdir(plugin_dir)):
+                if plugin_name.startswith("."):
+                    continue
+                
+                # Try to get plugin info file
+                info_file = f"{plugin_dir}/{plugin_name}/plugin.toml"
+                description = ""
+                version = "enabled"
+                
+                if os.path.exists(info_file):
+                    try:
+                        with open(info_file, "r") as f:
+                            for line in f:
+                                if "description" in line:
+                                    description = line.split("=", 1)[1].strip().strip('"')
+                                elif "version" in line:
+                                    version = line.split("=", 1)[1].strip().strip('"')
+                    except:
+                        pass
+                
+                plugin = {
+                    "name": plugin_name,
+                    "version": version,
+                    "description": description,
+                }
+                
+                # Get apps using this plugin
+                plugin["apps"] = await _get_plugin_apps(plugin_name)
+                plugins.append(plugin)
+    except OSError:
+        pass
     
     return templates.TemplateResponse(
         "plugins/list.html",
