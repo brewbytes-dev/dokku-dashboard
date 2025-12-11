@@ -106,6 +106,46 @@ class DokkuClient:
 
     async def app_info(self, app_name: str) -> App:
         """Get full app information."""
+        if self.use_docker:
+            return await self._app_info_docker(app_name)
+        return await self._app_info_ssh(app_name)
+
+    async def _app_info_docker(self, app_name: str) -> App:
+        """Get app info from Docker/filesystem - fast."""
+        import os
+        
+        # Get status from Docker
+        status = await self._app_status_docker(app_name)
+        
+        # Read domains from VHOST
+        domains = []
+        vhost_path = f"/home/dokku/{app_name}/VHOST"
+        try:
+            with open(vhost_path, "r") as f:
+                domains = [line.strip() for line in f if line.strip()]
+        except (FileNotFoundError, OSError):
+            pass
+        
+        # Count containers
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "ps", "-q",
+            "--filter", f"label=com.dokku.app-name={app_name}",
+            stdout=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        container_count = len([line for line in stdout.decode().strip().split("\n") if line])
+        
+        return App(
+            name=app_name,
+            status=status,
+            container_count=container_count,
+            domains=domains,
+            deploy_source="docker",  # We don't have this info without SSH
+            web_url=f"https://{domains[0]}" if domains else "",
+        )
+
+    async def _app_info_ssh(self, app_name: str) -> App:
+        """Get app info via SSH (slower)."""
         # Get status
         status = await self.app_status(app_name)
 
@@ -245,6 +285,40 @@ class DokkuClient:
 
     async def config_list(self, app_name: str) -> list[EnvVar]:
         """Get environment variables for an app."""
+        if self.use_docker:
+            return await self._config_list_docker(app_name)
+        return await self._config_list_ssh(app_name)
+
+    async def _config_list_docker(self, app_name: str) -> list[EnvVar]:
+        """Get config from ENV file - instant."""
+        env_vars = []
+        sensitive_keys = {"password", "secret", "key", "token", "api", "private"}
+        
+        env_path = f"/home/dokku/{app_name}/ENV"
+        try:
+            with open(env_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    
+                    # Parse KEY="VALUE" or KEY=VALUE
+                    if "=" in line:
+                        key, _, value = line.partition("=")
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        
+                        # Check if sensitive
+                        is_sensitive = any(s in key.lower() for s in sensitive_keys)
+                        
+                        env_vars.append(EnvVar(key=key, value=value, is_sensitive=is_sensitive))
+        except (FileNotFoundError, OSError):
+            pass
+        
+        return sorted(env_vars, key=lambda e: e.key)
+
+    async def _config_list_ssh(self, app_name: str) -> list[EnvVar]:
+        """Get config via SSH (slower)."""
         output = await self.run(f"config:show {app_name}")
         return self._parse_config(output)
 
