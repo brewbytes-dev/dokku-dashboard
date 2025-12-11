@@ -1,6 +1,7 @@
 """Dokku Dashboard - Main application."""
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,6 +15,15 @@ app = FastAPI(
     title="Dokku Dashboard",
     description="Web UI for managing Dokku applications",
     version="1.0.0",
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://dashboard.brewbytes.dev", "https://auth.brewbytes.dev"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Mount static files
