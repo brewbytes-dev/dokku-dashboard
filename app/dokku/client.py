@@ -165,17 +165,18 @@ class DokkuClient:
                     continue
         
         # Get all app directories (including apps with no containers)
-        proc2 = await asyncio.create_subprocess_exec(
-            "ls", "/home/dokku",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout2, _ = await proc2.communicate()
+        import os
+        skip_dirs = {"ENV", "VHOST", "tls", "dokkurc", ".basher", ".cache", ".config", ".ssh", ".local"}
         
         apps = []
-        for name in stdout2.decode().strip().split("\n"):
+        try:
+            all_dirs = os.listdir("/home/dokku")
+        except OSError:
+            all_dirs = []
+        
+        for name in all_dirs:
             # Skip non-app directories
-            if name.startswith(".") or name in ("tls", "dokkurc"):
+            if name.startswith(".") or name in skip_dirs:
                 continue
             
             status_str = app_status.get(name, "stopped")
