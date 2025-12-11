@@ -83,53 +83,41 @@ class DokkuClient:
         )
 
     async def get_all_apps(self) -> list[App]:
-        """Get all apps with basic info (fast version)."""
-        # Get all app names and their status in one connection
-        async with await self._connect() as conn:
-            # Get app list
-            result = await conn.run("apps:list", check=False)
-            app_names = [line.strip() for line in result.stdout.strip().split("\n")[1:] if line.strip()]
-            
-            apps = []
-            # Get basic status for each app using ps:report in batch
-            for name in app_names:
-                try:
-                    # Quick status check
-                    ps_result = await asyncio.wait_for(
-                        conn.run(f"ps:report {name}", check=False),
-                        timeout=5
-                    )
-                    output = ps_result.stdout or ""
-                    
-                    # Parse status
-                    if "running" in output.lower():
-                        status = AppStatus.RUNNING
-                    elif "stopped" in output.lower():
-                        status = AppStatus.STOPPED
-                    else:
-                        status = AppStatus.UNKNOWN
-                    
-                    # Quick domain parse
-                    domains = []
-                    for line in output.split("\n"):
-                        if "Ps web address:" in line:
-                            parts = line.split(":", 1)
-                            if len(parts) > 1 and parts[1].strip():
-                                domains = [parts[1].strip()]
-                                break
-                    
+        """Get all apps with basic info (fast version using global report)."""
+        # Get ALL app status in ONE command - much faster than per-app calls
+        output = await self.run("ps:report", timeout=30)
+        
+        apps = []
+        current_app = None
+        current_running = False
+        
+        for line in output.split("\n"):
+            # New app section
+            if line.startswith("=====>") and "ps information" in line:
+                # Save previous app
+                if current_app:
                     apps.append(App(
-                        name=name,
-                        status=status,
-                        domains=domains,
-                        web_url=f"https://{domains[0]}" if domains else "",
+                        name=current_app,
+                        status=AppStatus.RUNNING if current_running else AppStatus.STOPPED,
+                        web_url=f"https://{current_app}.brewbytes.dev",
                     ))
-                except asyncio.TimeoutError:
-                    apps.append(App(name=name, status=AppStatus.UNKNOWN))
-                except Exception:
-                    apps.append(App(name=name, status=AppStatus.UNKNOWN))
+                # Extract app name
+                current_app = line.replace("=====>", "").replace("ps information", "").strip()
+                current_running = False
             
-            return apps
+            # Check running status
+            elif current_app and "Running:" in line:
+                current_running = "true" in line.lower()
+        
+        # Don't forget last app
+        if current_app:
+            apps.append(App(
+                name=current_app,
+                status=AppStatus.RUNNING if current_running else AppStatus.STOPPED,
+                web_url=f"https://{current_app}.brewbytes.dev",
+            ))
+        
+        return apps
 
     async def app_start(self, app_name: str) -> str:
         """Start an app."""
