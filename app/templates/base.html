@@ -206,7 +206,12 @@
 
         // Modal helper
         function showModal(title, message, onConfirm) {
+            console.log('showModal called:', title, message);
             const modal = document.getElementById('modal');
+            if (!modal) {
+                console.error('Modal element not found!');
+                return;
+            }
             document.getElementById('modal-title').textContent = title;
             document.getElementById('modal-message').textContent = message;
             document.getElementById('modal-confirm').onclick = () => {
@@ -214,7 +219,7 @@
                 onConfirm();
             };
             modal.classList.remove('hidden');
-            modal.onclick = closeModal;
+            console.log('Modal shown, classes:', modal.className);
         }
 
         function closeModal() {
@@ -223,13 +228,17 @@
 
         // Override HTMX confirm with custom modal
         document.body.addEventListener('htmx:confirm', function(evt) {
+            console.log('htmx:confirm event triggered');
             const target = evt.detail.target;
             const message = target.getAttribute('hx-confirm');
+            console.log('hx-confirm message:', message);
             if (message) {
                 evt.preventDefault();
+                console.log('Showing modal for:', message);
                 showModal('Confirm Action', message, () => evt.detail.issueRequest());
+            } else {
+                console.log('No hx-confirm attribute, letting request proceed');
             }
-            // If no hx-confirm, let the request proceed normally
         });
 
         // Listen for HTMX events
