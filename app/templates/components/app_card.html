@@ -1,0 +1,80 @@
+<div id="app-{{ app.name }}" class="bg-slate-800 rounded-xl p-5 border border-slate-700 hover:border-slate-600 transition-colors">
+    <div class="flex items-start justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-indigo-600/20 flex items-center justify-center">
+                <span class="text-indigo-400 font-bold">{{ app.name[:2].upper() }}</span>
+            </div>
+            <div>
+                <a href="/apps/{{ app.name }}" class="text-white font-medium hover:text-indigo-400 transition-colors">
+                    {{ app.name }}
+                </a>
+                {% if app.primary_domain %}
+                <p class="text-slate-400 text-sm">{{ app.primary_domain }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Status Badge -->
+        {% if app.status.value == 'running' %}
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5 animate-pulse"></span>
+            Running
+        </span>
+        {% elif app.status.value == 'stopped' %}
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-500/10 text-slate-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span>
+            Stopped
+        </span>
+        {% else %}
+        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-400 mr-1.5"></span>
+            {{ app.status.value }}
+        </span>
+        {% endif %}
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-700">
+        <div class="flex items-center space-x-2">
+            {% if app.status.value == 'running' %}
+            <button 
+                hx-post="/apps/{{ app.name }}/restart"
+                hx-target="#app-{{ app.name }}"
+                hx-swap="outerHTML"
+                data-success-message="{{ app.name }} restarted"
+                class="text-amber-400 hover:text-amber-300 text-sm flex items-center"
+            >
+                <svg class="w-4 h-4 mr-1 htmx-indicator animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Restart
+            </button>
+            <span class="text-slate-600">|</span>
+            <button 
+                hx-post="/apps/{{ app.name }}/stop"
+                hx-target="#app-{{ app.name }}"
+                hx-swap="outerHTML"
+                hx-confirm="Stop {{ app.name }}?"
+                data-success-message="{{ app.name }} stopped"
+                class="text-red-400 hover:text-red-300 text-sm"
+            >
+                Stop
+            </button>
+            {% else %}
+            <button 
+                hx-post="/apps/{{ app.name }}/start"
+                hx-target="#app-{{ app.name }}"
+                hx-swap="outerHTML"
+                data-success-message="{{ app.name }} started"
+                class="text-green-400 hover:text-green-300 text-sm"
+            >
+                Start
+            </button>
+            {% endif %}
+        </div>
+        <a href="/logs/{{ app.name }}" class="text-slate-400 hover:text-white text-sm">
+            Logs →
+        </a>
+    </div>
+</div>
+

@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Logs - {{ app_name }} - Dokku Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <a href="/apps/{{ app_name }}" class="text-slate-400 hover:text-white transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <div>
+                <h1 class="text-xl font-bold text-white">{{ app_name }}</h1>
+                <p class="text-slate-400 text-sm">Live Logs</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-2">
+            <button 
+                id="pause-btn"
+                onclick="togglePause()"
+                class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm transition-colors flex items-center"
+            >
+                <svg id="pause-icon" class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                </svg>
+                <span id="pause-text">Pause</span>
+            </button>
+            <button 
+                onclick="clearLogs()"
+                class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+                Clear
+            </button>
+            <button 
+                onclick="downloadLogs()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+                Download
+            </button>
+        </div>
+    </div>
+
+    <!-- Log Container -->
+    <div class="bg-slate-900 rounded-xl border border-slate-700 overflow-hidden">
+        <div 
+            id="log-container"
+            class="h-[calc(100vh-220px)] overflow-y-auto p-4 scroll-smooth"
+            hx-ext="sse"
+            sse-connect="/logs/{{ app_name }}/stream"
+            sse-swap="log"
+            hx-swap="beforeend"
+        >
+            <!-- Initial logs will be loaded here -->
+            <div hx-get="/logs/{{ app_name }}/recent?lines=100" hx-trigger="load" hx-swap="innerHTML">
+                <div class="flex items-center justify-center py-8 text-slate-400">
+                    <svg class="w-5 h-5 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Loading logs...
+                </div>
+            </div>
+        </div>
+        
+        <!-- Status Bar -->
+        <div class="bg-slate-800 px-4 py-2 border-t border-slate-700 flex items-center justify-between text-sm">
+            <div class="flex items-center space-x-4">
+                <span class="flex items-center text-green-400">
+                    <span id="status-dot" class="w-2 h-2 rounded-full bg-green-400 mr-2 animate-pulse"></span>
+                    <span id="status-text">Connected</span>
+                </span>
+                <span class="text-slate-400" id="line-count">0 lines</span>
+            </div>
+            <label class="flex items-center text-slate-400">
+                <input 
+                    type="checkbox" 
+                    id="auto-scroll" 
+                    checked 
+                    class="mr-2 rounded bg-slate-700 border-slate-600 text-indigo-600"
+                >
+                Auto-scroll
+            </label>
+        </div>
+    </div>
+</div>
+
+<script>
+    let paused = false;
+    let lineCount = 0;
+    const container = document.getElementById('log-container');
+    const autoScroll = document.getElementById('auto-scroll');
+
+    // Auto scroll to bottom when new logs arrive
+    const observer = new MutationObserver(() => {
+        lineCount++;
+        document.getElementById('line-count').textContent = lineCount + ' lines';
+        if (!paused && autoScroll.checked) {
+            container.scrollTop = container.scrollHeight;
+        }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+
+    function togglePause() {
+        paused = !paused;
+        const btn = document.getElementById('pause-btn');
+        const icon = document.getElementById('pause-icon');
+        const text = document.getElementById('pause-text');
+        
+        if (paused) {
+            btn.classList.remove('bg-slate-700');
+            btn.classList.add('bg-amber-600');
+            icon.innerHTML = '<path d="M8 5v14l11-7L8 5z"/>';
+            text.textContent = 'Resume';
+        } else {
+            btn.classList.remove('bg-amber-600');
+            btn.classList.add('bg-slate-700');
+            icon.innerHTML = '<path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>';
+            text.textContent = 'Pause';
+            container.scrollTop = container.scrollHeight;
+        }
+    }
+
+    function clearLogs() {
+        container.innerHTML = '';
+        lineCount = 0;
+        document.getElementById('line-count').textContent = '0 lines';
+    }
+
+    function downloadLogs() {
+        const text = container.innerText;
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '{{ app_name }}-logs-' + new Date().toISOString().slice(0,10) + '.txt';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    // Handle SSE connection status
+    document.body.addEventListener('htmx:sseError', function() {
+        document.getElementById('status-dot').classList.remove('bg-green-400', 'animate-pulse');
+        document.getElementById('status-dot').classList.add('bg-red-400');
+        document.getElementById('status-text').textContent = 'Disconnected';
+        document.getElementById('status-text').classList.remove('text-green-400');
+        document.getElementById('status-text').classList.add('text-red-400');
+    });
+</script>
+{% endblock %}
+

@@ -1,0 +1,85 @@
+/* Custom styles for Dokku Dashboard */
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1e293b;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #475569;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+/* Log line styling */
+.log-line {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    padding: 2px 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.log-error {
+    color: #ef4444;
+    background-color: rgba(239, 68, 68, 0.1);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+.log-warn {
+    color: #f59e0b;
+}
+
+.log-info {
+    color: #22c55e;
+}
+
+/* HTMX loading indicator */
+.htmx-request .htmx-indicator {
+    display: inline-block !important;
+}
+
+.htmx-indicator {
+    display: none;
+}
+
+/* Transitions */
+.transition-colors {
+    transition-property: color, background-color, border-color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+
+/* Toast animations */
+.toast {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Focus styles */
+input:focus,
+button:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
+}
+

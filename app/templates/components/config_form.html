@@ -1,0 +1,54 @@
+<form 
+    hx-post="/config/{{ app_name }}/set"
+    hx-target="closest div.space-y-4"
+    hx-swap="outerHTML"
+    class="bg-slate-700/50 rounded-lg p-4 mb-4"
+>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-slate-400 text-sm mb-1">Key</label>
+            <input 
+                type="text" 
+                name="key" 
+                value="{{ key }}"
+                placeholder="MY_VARIABLE"
+                {% if is_edit %}readonly{% endif %}
+                class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono"
+                required
+            >
+        </div>
+        <div>
+            <label class="block text-slate-400 text-sm mb-1">Value</label>
+            <input 
+                type="text" 
+                name="value"
+                value="{{ value }}"
+                placeholder="my_value"
+                class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono"
+                required
+            >
+        </div>
+    </div>
+    <div class="flex items-center justify-between mt-4">
+        <label class="flex items-center text-sm text-slate-400">
+            <input type="checkbox" name="restart" value="true" checked class="mr-2 rounded bg-slate-800 border-slate-600 text-indigo-600">
+            Restart app after change
+        </label>
+        <div class="flex space-x-2">
+            <button 
+                type="button"
+                onclick="this.closest('form').remove()"
+                class="text-slate-400 hover:text-white px-4 py-2 text-sm"
+            >
+                Cancel
+            </button>
+            <button 
+                type="submit"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+            >
+                {{ 'Update' if is_edit else 'Add' }} Variable
+            </button>
+        </div>
+    </div>
+</form>
+
