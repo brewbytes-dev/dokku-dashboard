@@ -168,12 +168,13 @@
 
         // Override HTMX confirm with custom modal
         document.body.addEventListener('htmx:confirm', function(evt) {
-            evt.preventDefault();
             const target = evt.detail.target;
             const message = target.getAttribute('hx-confirm');
             if (message) {
+                evt.preventDefault();
                 showModal('Confirm Action', message, () => evt.detail.issueRequest());
             }
+            // If no hx-confirm, let the request proceed normally
         });
 
         // Listen for HTMX events
