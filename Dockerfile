@@ -2,9 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Docker CLI
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
+    curl \
+    && curl -fsSL https://get.docker.com | sh \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching

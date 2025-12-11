@@ -1,6 +1,7 @@
-"""Dokku SSH client."""
+"""Dokku client - uses Docker socket when available, SSH as fallback."""
 
 import asyncio
+import os
 import re
 from typing import AsyncIterator
 
@@ -9,15 +10,20 @@ import asyncssh
 from app.config import get_settings
 from app.dokku.models import App, AppStatus, EnvVar
 
+# Check if we can use Docker directly
+DOCKER_SOCKET = "/var/run/docker.sock"
+USE_DOCKER = os.path.exists(DOCKER_SOCKET)
+
 
 class DokkuClient:
-    """Async SSH client for Dokku commands."""
+    """Dokku client - prefers Docker socket over SSH for speed."""
 
     def __init__(self):
         settings = get_settings()
         self.host = settings.dokku_host
         self.user = settings.dokku_user
         self.key_path = settings.dokku_ssh_key
+        self.use_docker = USE_DOCKER
 
     async def _connect(self) -> asyncssh.SSHClientConnection:
         """Create SSH connection."""
@@ -69,6 +75,25 @@ class DokkuClient:
 
     async def app_status(self, app_name: str) -> AppStatus:
         """Get app running status."""
+        if self.use_docker:
+            return await self._app_status_docker(app_name)
+        return await self._app_status_ssh(app_name)
+
+    async def _app_status_docker(self, app_name: str) -> AppStatus:
+        """Get app status from Docker - instant."""
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "ps", "-q",
+            "--filter", f"label=com.dokku.app-name={app_name}",
+            "--filter", "status=running",
+            stdout=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if stdout.strip():
+            return AppStatus.RUNNING
+        return AppStatus.STOPPED
+
+    async def _app_status_ssh(self, app_name: str) -> AppStatus:
+        """Get app status via SSH (slower)."""
         output = await self.run(f"ps:report {app_name}")
 
         if "running" in output.lower():
@@ -106,8 +131,71 @@ class DokkuClient:
         )
 
     async def get_all_apps(self) -> list[App]:
-        """Get all apps with basic info (fast version - just list apps)."""
-        # apps:list is fast (~0.1s) vs ps:report (~20s)
+        """Get all apps with status - uses Docker socket if available."""
+        if self.use_docker:
+            return await self._get_apps_from_docker()
+        return await self._get_apps_from_ssh()
+
+    async def _get_apps_from_docker(self) -> list[App]:
+        """Get apps directly from Docker - instant!"""
+        import json
+        
+        # Get all Dokku containers in one Docker API call
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "ps", "-a",
+            "--filter", "label=com.dokku.app-name",
+            "--format", '{"name":"{{.Label "com.dokku.app-name"}}","status":"{{.State}}"}',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        
+        # Parse container info
+        app_status = {}  # app_name -> running/stopped
+        for line in stdout.decode().strip().split("\n"):
+            if line:
+                try:
+                    data = json.loads(line)
+                    name = data["name"]
+                    status = data["status"]
+                    # If any container for this app is running, mark as running
+                    if name not in app_status or status == "running":
+                        app_status[name] = status
+                except json.JSONDecodeError:
+                    continue
+        
+        # Get all app directories (including apps with no containers)
+        proc2 = await asyncio.create_subprocess_exec(
+            "ls", "/home/dokku",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout2, _ = await proc2.communicate()
+        
+        apps = []
+        for name in stdout2.decode().strip().split("\n"):
+            # Skip non-app directories
+            if name.startswith(".") or name in ("tls", "dokkurc"):
+                continue
+            
+            status_str = app_status.get(name, "stopped")
+            if status_str == "running":
+                status = AppStatus.RUNNING
+            elif status_str in ("exited", "dead"):
+                status = AppStatus.STOPPED
+            else:
+                status = AppStatus.UNKNOWN
+            
+            apps.append(App(
+                name=name,
+                status=status,
+                web_url=f"https://{name}.brewbytes.dev",
+            ))
+        
+        return sorted(apps, key=lambda a: a.name)
+
+    async def _get_apps_from_ssh(self) -> list[App]:
+        """Fallback: Get apps via SSH (slower)."""
         output = await self.run_fast("apps:list", timeout=10)
         
         apps = []
@@ -119,7 +207,7 @@ class DokkuClient:
             if name:
                 apps.append(App(
                     name=name,
-                    status=AppStatus.UNKNOWN,  # Don't query status - too slow
+                    status=AppStatus.UNKNOWN,
                     web_url=f"https://{name}.brewbytes.dev",
                 ))
         
