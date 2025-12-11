@@ -24,7 +24,7 @@
     </div>
 
     <!-- App Grid -->
-    <div id="app-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" hx-get="/apps" hx-trigger="every 30s" hx-swap="innerHTML">
+    <div id="app-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for app in apps %}
         {% include "components/app_card.html" %}
         {% endfor %}
