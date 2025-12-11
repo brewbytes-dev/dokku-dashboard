@@ -223,7 +223,7 @@ class DokkuClient:
             status_str = app_status.get(name, "stopped")
             if status_str == "running":
                 status = AppStatus.RUNNING
-            elif status_str in ("exited", "dead"):
+            elif status_str in ("exited", "dead", "stopped"):
                 status = AppStatus.STOPPED
             else:
                 status = AppStatus.UNKNOWN
