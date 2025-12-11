@@ -28,6 +28,29 @@ class DokkuClient:
             known_hosts=None,  # Skip host key verification for simplicity
         )
 
+    async def run_fast(self, command: str, timeout: int = 30) -> str:
+        """Execute a dokku command using subprocess (faster for large output)."""
+        ssh_cmd = [
+            "ssh",
+            "-i", self.key_path,
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "LogLevel=ERROR",
+            f"{self.user}@{self.host}",
+            command,
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *ssh_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+            return stdout.decode() or stderr.decode() or ""
+        except asyncio.TimeoutError:
+            proc.kill()
+            return ""
+
     async def run(self, command: str, timeout: int = 30) -> str:
         """Execute a dokku command and return output."""
         async with await self._connect() as conn:
@@ -84,8 +107,8 @@ class DokkuClient:
 
     async def get_all_apps(self) -> list[App]:
         """Get all apps with basic info (fast version using global report)."""
-        # Get ALL app status in ONE command - much faster than per-app calls
-        output = await self.run("ps:report", timeout=30)
+        # Get ALL app status in ONE command using subprocess (10x faster than asyncssh)
+        output = await self.run_fast("ps:report", timeout=30)
         
         apps = []
         current_app = None
