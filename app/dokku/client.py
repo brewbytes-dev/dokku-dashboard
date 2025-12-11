@@ -83,19 +83,53 @@ class DokkuClient:
         )
 
     async def get_all_apps(self) -> list[App]:
-        """Get all apps with their info."""
-        app_names = await self.apps_list()
-        apps = []
-
-        for name in app_names:
-            try:
-                app = await self.app_info(name)
-                apps.append(app)
-            except Exception:
-                # If we can't get info, add basic entry
-                apps.append(App(name=name, status=AppStatus.UNKNOWN))
-
-        return apps
+        """Get all apps with basic info (fast version)."""
+        # Get all app names and their status in one connection
+        async with await self._connect() as conn:
+            # Get app list
+            result = await conn.run("apps:list", check=False)
+            app_names = [line.strip() for line in result.stdout.strip().split("\n")[1:] if line.strip()]
+            
+            apps = []
+            # Get basic status for each app using ps:report in batch
+            for name in app_names:
+                try:
+                    # Quick status check
+                    ps_result = await asyncio.wait_for(
+                        conn.run(f"ps:report {name}", check=False),
+                        timeout=5
+                    )
+                    output = ps_result.stdout or ""
+                    
+                    # Parse status
+                    if "running" in output.lower():
+                        status = AppStatus.RUNNING
+                    elif "stopped" in output.lower():
+                        status = AppStatus.STOPPED
+                    else:
+                        status = AppStatus.UNKNOWN
+                    
+                    # Quick domain parse
+                    domains = []
+                    for line in output.split("\n"):
+                        if "Ps web address:" in line:
+                            parts = line.split(":", 1)
+                            if len(parts) > 1 and parts[1].strip():
+                                domains = [parts[1].strip()]
+                                break
+                    
+                    apps.append(App(
+                        name=name,
+                        status=status,
+                        domains=domains,
+                        web_url=f"https://{domains[0]}" if domains else "",
+                    ))
+                except asyncio.TimeoutError:
+                    apps.append(App(name=name, status=AppStatus.UNKNOWN))
+                except Exception:
+                    apps.append(App(name=name, status=AppStatus.UNKNOWN))
+            
+            return apps
 
     async def app_start(self, app_name: str) -> str:
         """Start an app."""
