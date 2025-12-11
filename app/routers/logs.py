@@ -77,3 +77,4 @@ def _escape_html(text: str) -> str:
         .replace("'", "&#39;")
     )
 
+

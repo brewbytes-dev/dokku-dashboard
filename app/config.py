@@ -26,3 +26,4 @@ def get_settings() -> Settings:
     """Get cached settings instance."""
     return Settings()
 
+

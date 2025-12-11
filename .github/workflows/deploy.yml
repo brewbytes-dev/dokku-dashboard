@@ -27,3 +27,4 @@ jobs:
           git remote add dokku dokku@${{ secrets.DOKKU_HOST }}:dokku-dashboard
           git push dokku main --force
 
+

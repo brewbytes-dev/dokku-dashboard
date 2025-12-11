@@ -35,3 +35,4 @@ def get_current_user(request: Request) -> User | None:
         uid=request.headers.get("X-Authentik-Uid", ""),
     )
 
+

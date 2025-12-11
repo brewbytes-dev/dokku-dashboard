@@ -139,6 +139,7 @@ class DokkuClient:
     async def _get_apps_from_docker(self) -> list[App]:
         """Get apps directly from Docker - instant!"""
         import json
+        import os
         
         # Get all Dokku containers in one Docker API call
         proc = await asyncio.create_subprocess_exec(
@@ -165,7 +166,6 @@ class DokkuClient:
                     continue
         
         # Get all app directories (including apps with no containers)
-        import os
         skip_dirs = {"ENV", "VHOST", "tls", "dokkurc", ".basher", ".cache", ".config", ".ssh", ".local"}
         
         apps = []
@@ -179,6 +179,7 @@ class DokkuClient:
             if name.startswith(".") or name in skip_dirs:
                 continue
             
+            # Get status
             status_str = app_status.get(name, "stopped")
             if status_str == "running":
                 status = AppStatus.RUNNING
@@ -187,10 +188,22 @@ class DokkuClient:
             else:
                 status = AppStatus.UNKNOWN
             
+            # Read real domain from VHOST file
+            domains = []
+            vhost_path = f"/home/dokku/{name}/VHOST"
+            try:
+                with open(vhost_path, "r") as f:
+                    domains = [line.strip() for line in f if line.strip()]
+            except (FileNotFoundError, OSError):
+                pass
+            
+            web_url = f"https://{domains[0]}" if domains else ""
+            
             apps.append(App(
                 name=name,
                 status=status,
-                web_url=f"https://{name}.brewbytes.dev",
+                domains=domains,
+                web_url=web_url,
             ))
         
         return sorted(apps, key=lambda a: a.name)

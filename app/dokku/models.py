@@ -46,3 +46,4 @@ class EnvVar:
             return "••••••••"
         return self.value
 
+
