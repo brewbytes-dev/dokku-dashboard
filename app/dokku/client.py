@@ -548,3 +548,163 @@ class DokkuClient:
 
         return env_vars
 
+    async def get_app_scaling(self, app_name: str) -> dict:
+        """Get app scaling information."""
+        from app.dokku.models import ProcessScale
+        
+        proc = await asyncio.create_subprocess_exec(
+            "dokku", "ps:scale", app_name,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        
+        processes = []
+        for line in stdout.decode().strip().split("\n"):
+            if ":" in line and not line.startswith("---") and not line.startswith("==="):
+                parts = line.split(":")
+                if len(parts) == 2:
+                    proc_type = parts[0].strip()
+                    qty = parts[1].strip()
+                    try:
+                        processes.append(ProcessScale(
+                            process_type=proc_type,
+                            quantity=int(qty)
+                        ))
+                    except ValueError:
+                        pass
+        
+        return {"processes": processes}
+
+    async def get_app_network_config(self, app_name: str) -> dict:
+        """Get app network configuration."""
+        proc = await asyncio.create_subprocess_exec(
+            "dokku", "network:report", app_name,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        
+        config = {
+            "attached_networks": [],
+            "bind_all_interfaces": False,
+            "initial_network": "",
+        }
+        
+        for line in stdout.decode().strip().split("\n"):
+            if "Network attach post deploy:" in line:
+                networks = line.split(":", 1)[1].strip()
+                if networks:
+                    config["attached_networks"] = networks.split()
+            elif "Network bind all interfaces:" in line:
+                config["bind_all_interfaces"] = "true" in line.lower()
+            elif "Network initial network:" in line:
+                config["initial_network"] = line.split(":", 1)[1].strip()
+        
+        # Get port mappings from proxy:report
+        proc = await asyncio.create_subprocess_exec(
+            "dokku", "proxy:report", app_name,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        
+        port_map = []
+        for line in stdout.decode().strip().split("\n"):
+            if "Proxy port map:" in line:
+                ports = line.split(":", 1)[1].strip()
+                if ports:
+                    port_map = ports.split()
+        
+        config["port_mappings"] = port_map
+        
+        return config
+
+    async def get_app_storage_mounts(self, app_name: str) -> list[dict]:
+        """Get app storage mounts."""
+        proc = await asyncio.create_subprocess_exec(
+            "dokku", "storage:report", app_name,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        
+        mounts = []
+        for line in stdout.decode().strip().split("\n"):
+            if ("Storage build mounts:" in line or 
+                "Storage deploy mounts:" in line or 
+                "Storage run mounts:" in line):
+                mount_info = line.split(":", 1)[1].strip()
+                if mount_info and mount_info != "none":
+                    for mount in mount_info.split():
+                        if ":" in mount:
+                            host, container = mount.split(":", 1)
+                            mounts.append({
+                                "host_path": host,
+                                "container_path": container,
+                                "type": "bind" if not host.startswith("/") else "volume"
+                            })
+        
+        return mounts
+
+    async def get_app_ssl_status(self, app_name: str) -> dict:
+        """Get app SSL certificate status."""
+        proc = await asyncio.create_subprocess_exec(
+            "dokku", "letsencrypt:list",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        
+        for line in stdout.decode().strip().split("\n"):
+            if line.strip().startswith(app_name):
+                parts = line.split()
+                if len(parts) >= 4:
+                    try:
+                        expiry_str = " ".join(parts[1:3])
+                        days_str = parts[3].split("d,")[0] if "d," in parts[3] else "0"
+                        days_until_expiry = int(days_str)
+                        
+                        return {
+                            "enabled": True,
+                            "expiry_date": expiry_str,
+                            "days_until_expiry": days_until_expiry,
+                        }
+                    except (ValueError, IndexError):
+                        pass
+        
+        return {"enabled": False}
+
+    async def get_app_health_checks(self, app_name: str) -> dict:
+        """Get app health check configuration."""
+        proc = await asyncio.create_subprocess_exec(
+            "dokku", "checks:report", app_name,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        
+        config = {
+            "disabled": [],
+            "skipped": [],
+            "wait_to_retire": 60,
+        }
+        
+        for line in stdout.decode().strip().split("\n"):
+            if "Checks disabled list:" in line:
+                disabled = line.split(":", 1)[1].strip()
+                if disabled and disabled != "none":
+                    config["disabled"] = disabled.split()
+            elif "Checks skipped list:" in line:
+                skipped = line.split(":", 1)[1].strip()
+                if skipped and skipped != "none":
+                    config["skipped"] = skipped.split()
+            elif "wait to retire:" in line.lower():
+                try:
+                    wait = line.split(":", 1)[1].strip()
+                    config["wait_to_retire"] = int(wait)
+                except ValueError:
+                    pass
+        
+        return config
+

@@ -26,12 +26,31 @@ async def list_apps(request: Request):
 async def app_detail(request: Request, app_name: str):
     """Get app details."""
     client = DokkuClient()
-    app = await client.app_info(app_name)
-    config = await client.config_list(app_name)
+    
+    # Gather all app information in parallel
+    import asyncio
+    app, config, scaling, network, storage, ssl_status, health = await asyncio.gather(
+        client.app_info(app_name),
+        client.config_list(app_name),
+        client.get_app_scaling(app_name),
+        client.get_app_network_config(app_name),
+        client.get_app_storage_mounts(app_name),
+        client.get_app_ssl_status(app_name),
+        client.get_app_health_checks(app_name),
+    )
 
     return templates.TemplateResponse(
         "apps/detail.html",
-        {"request": request, "app": app, "config": config},
+        {
+            "request": request,
+            "app": app,
+            "config": config,
+            "scaling": scaling,
+            "network": network,
+            "storage": storage,
+            "ssl": ssl_status,
+            "health": health,
+        },
     )
 
 

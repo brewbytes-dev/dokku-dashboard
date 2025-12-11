@@ -50,3 +50,57 @@ class EnvVar:
         return self.value
 
 
+@dataclass
+class Service:
+    """Dokku service (Redis, Postgres, MySQL, etc)."""
+
+    name: str
+    type: str  # redis, postgres, mysql, mongo
+    version: str
+    status: str  # running, stopped
+    dsn: str
+    linked_apps: list[str] = field(default_factory=list)
+    config_dir: str = ""
+    data_dir: str = ""
+
+    @property
+    def masked_dsn(self) -> str:
+        """Get masked DSN for display."""
+        if ":" in self.dsn and "@" in self.dsn:
+            # redis://:password@host:port format
+            parts = self.dsn.split("@")
+            if len(parts) == 2:
+                return f"•••••••@{parts[1]}"
+        return "••••••••"
+
+
+@dataclass
+class SSLCertificate:
+    """SSL certificate information."""
+
+    app_name: str
+    expiry_date: str
+    days_until_expiry: int
+    days_until_renewal: int
+    auto_renew: bool = True
+
+    @property
+    def status_color(self) -> str:
+        """Get color based on days until expiry."""
+        if self.days_until_expiry > 60:
+            return "green"
+        elif self.days_until_expiry > 30:
+            return "yellow"
+        elif self.days_until_expiry > 7:
+            return "orange"
+        return "red"
+
+
+@dataclass
+class ProcessScale:
+    """Process scaling information."""
+
+    process_type: str  # web, worker, release
+    quantity: int
+
+

@@ -98,7 +98,7 @@
         </div>
 
         <!-- Info Grid -->
-        <div id="app-status" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-700">
+        <div id="app-status" class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-6 border-t border-slate-700">
             <div>
                 <p class="text-slate-400 text-sm">Containers</p>
                 <p class="text-white font-medium">{{ app.container_count }}</p>
@@ -115,34 +115,114 @@
                 <p class="text-slate-400 text-sm">Status</p>
                 <p class="text-white font-medium capitalize">{{ app.status.value }}</p>
             </div>
+            <div>
+                <p class="text-slate-400 text-sm">SSL Certificate</p>
+                {% if ssl.enabled %}
+                <div class="flex items-center space-x-1">
+                    <span class="text-green-400 font-medium">✓ Enabled</span>
+                    <span class="text-slate-400 text-xs">({{ ssl.days_until_expiry }}d)</span>
+                </div>
+                {% else %}
+                <p class="text-slate-500 font-medium">Not Enabled</p>
+                {% endif %}
+            </div>
         </div>
     </div>
 
     <!-- Tabs -->
     <div class="bg-slate-800 rounded-xl border border-slate-700">
         <div class="border-b border-slate-700">
-            <nav class="flex space-x-8 px-6" aria-label="Tabs">
+            <nav class="flex space-x-8 px-6 overflow-x-auto" aria-label="Tabs">
                 <button 
-                    class="tab-btn active border-b-2 border-indigo-500 text-indigo-400 py-4 px-1 text-sm font-medium"
+                    class="tab-btn active border-b-2 border-indigo-500 text-indigo-400 py-4 px-1 text-sm font-medium whitespace-nowrap"
+                    onclick="showTab('overview')"
+                    id="tab-overview"
+                >
+                    Overview
+                </button>
+                <button 
+                    class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-white py-4 px-1 text-sm font-medium whitespace-nowrap"
                     onclick="showTab('config')"
                     id="tab-config"
                 >
-                    Environment Variables
+                    Environment
                 </button>
                 <button 
-                    class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-white py-4 px-1 text-sm font-medium"
-                    onclick="showTab('domains')"
-                    id="tab-domains"
+                    class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-white py-4 px-1 text-sm font-medium whitespace-nowrap"
+                    onclick="showTab('scaling')"
+                    id="tab-scaling"
                 >
-                    Domains
+                    Scaling
+                </button>
+                <button 
+                    class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-white py-4 px-1 text-sm font-medium whitespace-nowrap"
+                    onclick="showTab('network')"
+                    id="tab-network"
+                >
+                    Network
+                </button>
+                <button 
+                    class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-white py-4 px-1 text-sm font-medium whitespace-nowrap"
+                    onclick="showTab('storage')"
+                    id="tab-storage"
+                >
+                    Storage
+                </button>
+                <button 
+                    class="tab-btn border-b-2 border-transparent text-slate-400 hover:text-white py-4 px-1 text-sm font-medium whitespace-nowrap"
+                    onclick="showTab('health')"
+                    id="tab-health"
+                >
+                    Health Checks
                 </button>
             </nav>
         </div>
 
         <!-- Tab Content -->
         <div class="p-6">
+            <!-- Overview Tab -->
+            <div id="content-overview" class="tab-content">
+                <div class="space-y-6">
+                    <!-- Domains -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-white mb-3">Domains</h3>
+                        <div class="space-y-2">
+                            {% for domain in app.domains %}
+                            <div class="flex items-center justify-between bg-slate-700/50 rounded-lg px-4 py-3">
+                                <span class="text-white">{{ domain }}</span>
+                                <a href="https://{{ domain }}" target="_blank" class="text-indigo-400 hover:text-indigo-300 text-sm">
+                                    Visit →
+                                </a>
+                            </div>
+                            {% else %}
+                            <p class="text-slate-400 text-sm">No domains configured</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- SSL Certificate -->
+                    {% if ssl.enabled %}
+                    <div>
+                        <h3 class="text-lg font-semibold text-white mb-3">SSL Certificate</h3>
+                        <div class="bg-slate-700/50 rounded-lg p-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-slate-400 text-sm mb-1">Expiry Date</p>
+                                    <p class="text-white font-medium">{{ ssl.expiry_date }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-slate-400 text-sm mb-1">Days Until Expiry</p>
+                                    <p class="text-white font-medium">{{ ssl.days_until_expiry }} days</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
             <!-- Config Tab -->
-            <div id="content-config" class="tab-content">
+            <div id="content-config" class="tab-content hidden">
                 <div hx-get="/config/{{ app.name }}" hx-trigger="load" hx-swap="innerHTML">
                     <div class="flex items-center justify-center py-8">
                         <svg class="w-6 h-6 animate-spin text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -152,19 +232,143 @@
                 </div>
             </div>
 
-            <!-- Domains Tab -->
-            <div id="content-domains" class="tab-content hidden">
-                <div class="space-y-2">
-                    {% for domain in app.domains %}
-                    <div class="flex items-center justify-between bg-slate-700/50 rounded-lg px-4 py-3">
-                        <span class="text-white">{{ domain }}</span>
-                        <a href="https://{{ domain }}" target="_blank" class="text-indigo-400 hover:text-indigo-300 text-sm">
-                            Visit →
-                        </a>
-                    </div>
+            <!-- Scaling Tab -->
+            <div id="content-scaling" class="tab-content hidden">
+                <h3 class="text-lg font-semibold text-white mb-3">Process Scaling</h3>
+                <div class="space-y-3">
+                    {% if scaling.processes %}
+                        {% for proc in scaling.processes %}
+                        <div class="bg-slate-700/50 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-white font-medium">{{ proc.process_type }}</p>
+                                    <p class="text-slate-400 text-sm">{{ proc.quantity }} {{ 'container' if proc.quantity == 1 else 'containers' }}</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-2xl font-bold text-indigo-400">{{ proc.quantity }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     {% else %}
-                    <p class="text-slate-400 text-sm">No domains configured</p>
-                    {% endfor %}
+                        <p class="text-slate-400 text-sm">No scaling information available</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Network Tab -->
+            <div id="content-network" class="tab-content hidden">
+                <div class="space-y-6">
+                    <!-- Networks -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-white mb-3">Attached Networks</h3>
+                        <div class="space-y-2">
+                            {% if network.attached_networks %}
+                                {% for net in network.attached_networks %}
+                                <div class="bg-slate-700/50 rounded-lg px-4 py-3">
+                                    <span class="text-white font-mono">{{ net }}</span>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-slate-400 text-sm">No custom networks attached</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Port Mappings -->
+                    <div>
+                        <h3 class="text-lg font-semibold text-white mb-3">Port Mappings</h3>
+                        <div class="space-y-2">
+                            {% if network.port_mappings %}
+                                {% for mapping in network.port_mappings %}
+                                <div class="bg-slate-700/50 rounded-lg px-4 py-3">
+                                    <span class="text-white font-mono">{{ mapping }}</span>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-slate-400 text-sm">No port mappings configured</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Storage Tab -->
+            <div id="content-storage" class="tab-content hidden">
+                <h3 class="text-lg font-semibold text-white mb-3">Volume Mounts</h3>
+                <div class="space-y-3">
+                    {% if storage %}
+                        {% for mount in storage %}
+                        <div class="bg-slate-700/50 rounded-lg p-4">
+                            <div class="space-y-2">
+                                <div>
+                                    <p class="text-slate-400 text-sm">Host Path</p>
+                                    <p class="text-white font-mono text-sm">{{ mount.host_path }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-slate-400 text-sm">Container Path</p>
+                                    <p class="text-white font-mono text-sm">{{ mount.container_path }}</p>
+                                </div>
+                                <div>
+                                    <span class="px-2 py-1 text-xs font-medium bg-indigo-600/20 text-indigo-300 rounded-full border border-indigo-600/30">
+                                        {{ mount.type }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-slate-400 text-sm">No persistent storage mounts configured</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Health Checks Tab -->
+            <div id="content-health" class="tab-content hidden">
+                <h3 class="text-lg font-semibold text-white mb-3">Health Check Configuration</h3>
+                <div class="space-y-4">
+                    <div class="bg-slate-700/50 rounded-lg p-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-slate-400 text-sm mb-1">Wait to Retire</p>
+                                <p class="text-white font-medium">{{ health.wait_to_retire }} seconds</p>
+                            </div>
+                            <div>
+                                <p class="text-slate-400 text-sm mb-1">Status</p>
+                                {% if health.disabled %}
+                                    <span class="text-red-400 font-medium">Disabled</span>
+                                {% else %}
+                                    <span class="text-green-400 font-medium">Enabled</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if health.disabled %}
+                    <div>
+                        <p class="text-slate-400 text-sm mb-2">Disabled Checks</p>
+                        <div class="space-y-2">
+                            {% for check in health.disabled %}
+                            <div class="bg-slate-700/50 rounded-lg px-4 py-2">
+                                <span class="text-white font-mono text-sm">{{ check }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if health.skipped %}
+                    <div>
+                        <p class="text-slate-400 text-sm mb-2">Skipped Checks</p>
+                        <div class="space-y-2">
+                            {% for check in health.skipped %}
+                            <div class="bg-slate-700/50 rounded-lg px-4 py-2">
+                                <span class="text-white font-mono text-sm">{{ check }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
