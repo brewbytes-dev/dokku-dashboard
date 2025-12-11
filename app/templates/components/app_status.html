@@ -1,0 +1,30 @@
+<div id="app-status" class="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6 pt-6 border-t border-slate-700">
+    <div>
+        <p class="text-slate-400 text-sm">Containers</p>
+        <p class="text-white font-medium">{{ app.container_count }}</p>
+    </div>
+    <div>
+        <p class="text-slate-400 text-sm">Deploy Source</p>
+        <p class="text-white font-medium">{{ app.deploy_source or 'N/A' }}</p>
+    </div>
+    <div>
+        <p class="text-slate-400 text-sm">Domains</p>
+        <p class="text-white font-medium">{{ app.domains|length }}</p>
+    </div>
+    <div>
+        <p class="text-slate-400 text-sm">Status</p>
+        <p class="text-white font-medium capitalize">{{ app.status.value }}</p>
+    </div>
+    <div>
+        <p class="text-slate-400 text-sm">SSL Certificate</p>
+        {% if ssl and ssl.enabled %}
+        <div class="flex items-center space-x-1">
+            <span class="text-green-400 font-medium">✓ Enabled</span>
+            <span class="text-slate-400 text-xs">({{ ssl.days_until_expiry }}d)</span>
+        </div>
+        {% else %}
+        <p class="text-slate-500 font-medium">Not Enabled</p>
+        {% endif %}
+    </div>
+</div>
+
