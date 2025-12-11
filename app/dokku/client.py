@@ -106,39 +106,22 @@ class DokkuClient:
         )
 
     async def get_all_apps(self) -> list[App]:
-        """Get all apps with basic info (fast version using global report)."""
-        # Get ALL app status in ONE command using subprocess (10x faster than asyncssh)
-        output = await self.run_fast("ps:report", timeout=30)
+        """Get all apps with basic info (fast version - just list apps)."""
+        # apps:list is fast (~0.1s) vs ps:report (~20s)
+        output = await self.run_fast("apps:list", timeout=10)
         
         apps = []
-        current_app = None
-        current_running = False
+        lines = output.strip().split("\n")
         
-        for line in output.split("\n"):
-            # New app section
-            if line.startswith("=====>") and "ps information" in line:
-                # Save previous app
-                if current_app:
-                    apps.append(App(
-                        name=current_app,
-                        status=AppStatus.RUNNING if current_running else AppStatus.STOPPED,
-                        web_url=f"https://{current_app}.brewbytes.dev",
-                    ))
-                # Extract app name
-                current_app = line.replace("=====>", "").replace("ps information", "").strip()
-                current_running = False
-            
-            # Check running status
-            elif current_app and "Running:" in line:
-                current_running = "true" in line.lower()
-        
-        # Don't forget last app
-        if current_app:
-            apps.append(App(
-                name=current_app,
-                status=AppStatus.RUNNING if current_running else AppStatus.STOPPED,
-                web_url=f"https://{current_app}.brewbytes.dev",
-            ))
+        # Skip header line "=====> My Apps"
+        for line in lines[1:]:
+            name = line.strip()
+            if name:
+                apps.append(App(
+                    name=name,
+                    status=AppStatus.UNKNOWN,  # Don't query status - too slow
+                    web_url=f"https://{name}.brewbytes.dev",
+                ))
         
         return apps
 

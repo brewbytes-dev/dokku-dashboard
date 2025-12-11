@@ -98,3 +98,24 @@ async def app_card(request: Request, app_name: str):
         {"request": request, "app": app},
     )
 
+
+@router.get("/{app_name}/status", response_class=HTMLResponse)
+async def app_status(request: Request, app_name: str):
+    """Get app status badge (for lazy loading)."""
+    client = DokkuClient()
+    status = await client.app_status(app_name)
+
+    # Return just the status badge HTML
+    status_colors = {
+        "running": "bg-green-500",
+        "stopped": "bg-red-500",
+        "crashed": "bg-orange-500",
+        "unknown": "bg-gray-500",
+    }
+    color = status_colors.get(status.value, "bg-gray-500")
+
+    return HTMLResponse(
+        f'<span class="px-2 py-1 text-xs font-medium text-white rounded-full {color}">'
+        f'{status.value}</span>'
+    )
+
