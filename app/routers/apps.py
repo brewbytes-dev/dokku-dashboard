@@ -68,7 +68,7 @@ async def start_app(request: Request, app_name: str):
     
     # Check if called from detail page or list page
     target = request.headers.get("hx-target", "")
-    if target == "app-status":
+    if target == "#app-status":
         return templates.TemplateResponse(
             "components/app_status.html",
             {"request": request, "app": app, "ssl": ssl_status},
@@ -94,7 +94,7 @@ async def stop_app(request: Request, app_name: str):
     
     # Check if called from detail page or list page
     target = request.headers.get("hx-target", "")
-    if target == "app-status":
+    if target == "#app-status":
         return templates.TemplateResponse(
             "components/app_status.html",
             {"request": request, "app": app, "ssl": ssl_status},
@@ -120,7 +120,7 @@ async def restart_app(request: Request, app_name: str):
     
     # Check if called from detail page or list page
     target = request.headers.get("hx-target", "")
-    if target == "app-status":
+    if target == "#app-status":
         return templates.TemplateResponse(
             "components/app_status.html",
             {"request": request, "app": app, "ssl": ssl_status},
