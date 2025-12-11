@@ -10,6 +10,9 @@ class AppStatus(str, Enum):
     RUNNING = "running"
     STOPPED = "stopped"
     CRASHED = "crashed"
+    RESTARTING = "restarting"
+    STARTING = "starting"
+    STOPPING = "stopping"
     UNKNOWN = "unknown"
 
 

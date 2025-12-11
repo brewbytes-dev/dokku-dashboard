@@ -181,27 +181,41 @@ class DokkuClient:
         import json
         import os
         
-        # Get all Dokku containers in one Docker API call
+        # Get all Dokku containers with their states
         proc = await asyncio.create_subprocess_exec(
             "docker", "ps", "-a",
             "--filter", "label=com.dokku.app-name",
-            "--format", '{"name":"{{.Label "com.dokku.app-name"}}","status":"{{.State}}"}',
+            "--format", '{"name":"{{.Label "com.dokku.app-name"}}","state":"{{.State}}","status":"{{.Status}}"}',
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, _ = await proc.communicate()
         
         # Parse container info
-        app_status = {}  # app_name -> running/stopped
+        app_status = {}  # app_name -> state
         for line in stdout.decode().strip().split("\n"):
             if line:
                 try:
                     data = json.loads(line)
                     name = data["name"]
-                    status = data["status"]
-                    # If any container for this app is running, mark as running
-                    if name not in app_status or status == "running":
-                        app_status[name] = status
+                    state = data["state"].lower()
+                    status_text = data["status"].lower()
+                    
+                    # Detect transitional states
+                    if "restarting" in state or "restarting" in status_text:
+                        state = "restarting"
+                    elif state == "created":
+                        state = "starting"
+                    
+                    # Priority: restarting > starting > running > exited
+                    if name not in app_status:
+                        app_status[name] = state
+                    elif state == "restarting":
+                        app_status[name] = state
+                    elif state == "starting" and app_status[name] not in ["restarting"]:
+                        app_status[name] = state
+                    elif state == "running" and app_status[name] not in ["restarting", "starting"]:
+                        app_status[name] = state
                 except json.JSONDecodeError:
                     continue
         
@@ -223,6 +237,10 @@ class DokkuClient:
             status_str = app_status.get(name, "stopped")
             if status_str == "running":
                 status = AppStatus.RUNNING
+            elif status_str == "restarting":
+                status = AppStatus.RESTARTING
+            elif status_str == "starting":
+                status = AppStatus.STARTING
             elif status_str in ("exited", "dead", "stopped"):
                 status = AppStatus.STOPPED
             else:
