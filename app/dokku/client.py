@@ -269,19 +269,80 @@ class DokkuClient:
 
     async def app_start(self, app_name: str) -> str:
         """Start an app."""
+        if self.use_docker:
+            return await self._app_start_docker(app_name)
         return await self.run(f"ps:start {app_name}", timeout=60)
 
     async def app_stop(self, app_name: str) -> str:
         """Stop an app."""
+        if self.use_docker:
+            return await self._app_stop_docker(app_name)
         return await self.run(f"ps:stop {app_name}", timeout=60)
 
     async def app_restart(self, app_name: str) -> str:
         """Restart an app."""
+        if self.use_docker:
+            return await self._app_restart_docker(app_name)
         return await self.run(f"ps:restart {app_name}", timeout=120)
 
     async def app_rebuild(self, app_name: str) -> str:
         """Rebuild an app."""
+        if self.use_docker:
+            return await self._app_rebuild_docker(app_name)
         return await self.run(f"ps:rebuild {app_name}", timeout=300)
+
+    async def _app_start_docker(self, app_name: str) -> str:
+        """Start app containers directly."""
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "start",
+            *await self._get_container_names(app_name),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        return stdout.decode() or stderr.decode()
+
+    async def _app_stop_docker(self, app_name: str) -> str:
+        """Stop app containers directly."""
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "stop",
+            *await self._get_container_names(app_name),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        return stdout.decode() or stderr.decode()
+
+    async def _app_restart_docker(self, app_name: str) -> str:
+        """Restart app containers directly."""
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "restart",
+            *await self._get_container_names(app_name),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        return stdout.decode() or stderr.decode()
+
+    async def _app_rebuild_docker(self, app_name: str) -> str:
+        """Rebuild via dokku command directly."""
+        proc = await asyncio.create_subprocess_exec(
+            "dokku", "ps:rebuild", app_name,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        return stdout.decode() or stderr.decode()
+
+    async def _get_container_names(self, app_name: str) -> list[str]:
+        """Get all container names for an app."""
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "ps", "-aq",
+            "--filter", f"label=com.dokku.app-name={app_name}",
+            stdout=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        return stdout.decode().strip().split("\n")
 
     async def config_list(self, app_name: str) -> list[EnvVar]:
         """Get environment variables for an app."""
@@ -324,6 +385,8 @@ class DokkuClient:
 
     async def config_set(self, app_name: str, key: str, value: str, restart: bool = True) -> str:
         """Set an environment variable."""
+        if self.use_docker:
+            return await self._config_set_docker(app_name, key, value, restart)
         restart_flag = "" if restart else "--no-restart"
         # Escape value for shell
         escaped_value = value.replace("'", "'\"'\"'")
@@ -331,19 +394,86 @@ class DokkuClient:
 
     async def config_unset(self, app_name: str, key: str, restart: bool = True) -> str:
         """Unset an environment variable."""
+        if self.use_docker:
+            return await self._config_unset_docker(app_name, key, restart)
         restart_flag = "" if restart else "--no-restart"
         return await self.run(f"config:unset {restart_flag} {app_name} {key}", timeout=120)
 
+    async def _config_set_docker(self, app_name: str, key: str, value: str, restart: bool = True) -> str:
+        """Set config using dokku command directly."""
+        restart_flag = [] if restart else ["--no-restart"]
+        # Escape value for shell
+        escaped_value = value.replace("'", "'\"'\"'")
+        
+        proc = await asyncio.create_subprocess_exec(
+            "dokku", "config:set", *restart_flag, app_name, f"{key}='{escaped_value}'",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+        return stdout.decode() or stderr.decode()
+
+    async def _config_unset_docker(self, app_name: str, key: str, restart: bool = True) -> str:
+        """Unset config using dokku command directly."""
+        restart_flag = [] if restart else ["--no-restart"]
+        
+        proc = await asyncio.create_subprocess_exec(
+            "dokku", "config:unset", *restart_flag, app_name, key,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+        return stdout.decode() or stderr.decode()
+
     async def logs_stream(self, app_name: str, lines: int = 100) -> AsyncIterator[str]:
         """Stream logs from an app."""
-        async with await self._connect() as conn:
-            async with conn.create_process(f"logs {app_name} -t -n {lines}") as proc:
-                async for line in proc.stdout:
-                    yield line.rstrip("\n")
+        if self.use_docker:
+            async for line in self._logs_stream_docker(app_name, lines):
+                yield line
+        else:
+            async with await self._connect() as conn:
+                async with conn.create_process(f"logs {app_name} -t -n {lines}") as proc:
+                    async for line in proc.stdout:
+                        yield line.rstrip("\n")
+
+    async def _logs_stream_docker(self, app_name: str, lines: int = 100) -> AsyncIterator[str]:
+        """Stream logs directly from Docker."""
+        containers = await self._get_container_names(app_name)
+        if not containers or not containers[0]:
+            return
+        
+        # Stream from first web container
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "logs", "-f", "-n", str(lines), "-t", containers[0],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            yield line.decode().rstrip("\n")
 
     async def logs_recent(self, app_name: str, lines: int = 100) -> str:
         """Get recent logs."""
+        if self.use_docker:
+            return await self._logs_recent_docker(app_name, lines)
         return await self.run(f"logs {app_name} -n {lines}")
+
+    async def _logs_recent_docker(self, app_name: str, lines: int = 100) -> str:
+        """Get recent logs directly from Docker."""
+        containers = await self._get_container_names(app_name)
+        if not containers or not containers[0]:
+            return "No containers found"
+        
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "logs", "-n", str(lines), "-t", containers[0],
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        stdout, _ = await proc.communicate()
+        return stdout.decode()
 
     # Parser methods
     def _parse_domains(self, output: str) -> list[str]:
