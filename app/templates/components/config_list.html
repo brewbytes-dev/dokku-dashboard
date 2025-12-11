@@ -26,14 +26,18 @@
         <div class="flex items-center justify-between bg-slate-700/50 rounded-lg px-4 py-3 group">
             <div class="flex-1 min-w-0">
                 <p class="text-indigo-400 font-mono text-sm">{{ var.key }}</p>
-                <p class="text-slate-300 font-mono text-sm truncate mt-1" id="value-{{ loop.index }}">
+                <p class="text-slate-300 font-mono text-sm truncate mt-1" 
+                   id="value-{{ var.key|replace('.', '-')|replace('_', '-') }}"
+                   data-hidden="••••••••"
+                   data-shown="{{ var.value|e }}"
+                   data-visible="false">
                     {{ var.masked_value }}
                 </p>
             </div>
             <div class="flex items-center space-x-2 ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
                 {% if var.is_sensitive %}
                 <button 
-                    onclick="toggleValue({{ loop.index }}, '{{ var.value|e }}')"
+                    onclick="toggleValueDisplay('{{ var.key|replace('.', '-')|replace('_', '-') }}')"
                     class="text-slate-400 hover:text-white text-sm"
                     title="Show/Hide"
                 >
@@ -64,11 +68,11 @@
 </div>
 
 <script>
-    const shown = {};
-    function toggleValue(idx, value) {
-        const el = document.getElementById('value-' + idx);
-        shown[idx] = !shown[idx];
-        el.textContent = shown[idx] ? value : '••••••••';
+    function toggleValueDisplay(key) {
+        const el = document.getElementById('value-' + key);
+        const isVisible = el.dataset.visible === 'true';
+        el.dataset.visible = !isVisible;
+        el.textContent = isVisible ? el.dataset.hidden : el.dataset.shown;
     }
 </script>
 
