@@ -1,0 +1,62 @@
+name: Deploy Dokku MCP
+
+on:
+  pull_request:
+    paths:
+      - 'mcp-dokku/**'
+      - '.github/workflows/deploy-mcp.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'mcp-dokku/**'
+      - '.github/workflows/deploy-mcp.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: mcp-dokku/requirements.txt
+      - run: python -m pip install -r mcp-dokku/requirements.txt
+      - name: Run MCP security tests
+        env:
+          PYTHONPATH: mcp-dokku
+          GITHUB_CLIENT_ID: test-client
+          GITHUB_CLIENT_SECRET: test-secret
+          JWT_SIGNING_KEY: test-signing-key-long-enough-for-tests
+        run: python -m unittest discover -s mcp-dokku -p 'test_*.py' -v
+      - name: Build isolated MCP image
+        run: docker build -f mcp-dokku/Dockerfile -t dokku-mcp:test .
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure SSH
+        env:
+          DOKKU_SSH_KEY: ${{ secrets.DOKKU_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DOKKU_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' 'mcp.brewbytes.dev ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAJUx2FGUCtTXW4LwMxKMJzXsgmBiDZYuFJ6/uismRdC' > ~/.ssh/known_hosts
+
+      - name: Deploy Dokku MCP app
+        run: |
+          git remote add dokku "dokku@mcp.brewbytes.dev:dokku-mcp"
+          git push dokku HEAD:main
