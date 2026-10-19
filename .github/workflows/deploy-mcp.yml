@@ -51,9 +51,11 @@ jobs:
         env:
           DOKKU_SSH_KEY: ${{ secrets.DOKKU_SSH_KEY }}
         run: |
+          test -n "$DOKKU_SSH_KEY" || { echo 'Missing DOKKU_SSH_KEY Actions secret' >&2; exit 1; }
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$DOKKU_SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$DOKKU_SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keygen -y -f ~/.ssh/id_rsa >/dev/null
           printf '%s\n' 'mcp.brewbytes.dev ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAJUx2FGUCtTXW4LwMxKMJzXsgmBiDZYuFJ6/uismRdC' > ~/.ssh/known_hosts
 
       - name: Configure GitHub OAuth
