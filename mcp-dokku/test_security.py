@@ -12,12 +12,16 @@ from server import run_ssh_command
 class GitHubAllowlistTests(unittest.TestCase):
     @patch.object(security, "get_access_token")
     def test_allows_only_the_configured_github_login(self, get_token):
-        get_token.return_value = SimpleNamespace(claims={"login": "ismirnov_align"})
+        get_token.return_value = SimpleNamespace(claims={"login": "brewbytes-dev"})
         security.require_allowed_github_user()
 
-        get_token.return_value = SimpleNamespace(claims={"login": "someone-else"})
-        with self.assertRaises(ToolError):
-            security.require_allowed_github_user()
+        get_token.return_value = SimpleNamespace(claims={"login": "BREWBYTES-DEV"})
+        security.require_allowed_github_user()
+
+        for login in ("ismirnov_align", "someone-else"):
+            get_token.return_value = SimpleNamespace(claims={"login": login})
+            with self.subTest(login=login), self.assertRaises(ToolError):
+                security.require_allowed_github_user()
 
     @patch.object(security, "get_access_token")
     def test_denies_missing_or_malformed_identity(self, get_token):

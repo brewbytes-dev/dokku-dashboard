@@ -1,6 +1,6 @@
 # Dokku root MCP
 
-The MCP endpoint is `https://mcp.brewbytes.dev/mcp`. It uses GitHub OAuth and only `ismirnov_align` may run tools. Its one tool, `run_root_command`, executes an arbitrary command as root on the Dokku host.
+The MCP endpoint is `https://mcp.brewbytes.dev/mcp`. It uses GitHub OAuth and only the GitHub account `brewbytes-dev` may run tools. Its one tool, `run_root_command`, executes an arbitrary command as root on the Dokku host.
 
 Root commands can read every secret and file on the host. Command output is returned to the connected agent, so GitHub OAuth restricts who can connect but cannot prevent secret disclosure by a root command. Do not attach this server to agents or workflows that should not have full host access.
 

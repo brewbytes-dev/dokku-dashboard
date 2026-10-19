@@ -1,7 +1,7 @@
 from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_access_token
 
-ALLOWED_GITHUB_LOGIN = "ismirnov_align"
+ALLOWED_GITHUB_LOGIN = "brewbytes-dev"
 
 
 def require_allowed_github_user() -> None:
