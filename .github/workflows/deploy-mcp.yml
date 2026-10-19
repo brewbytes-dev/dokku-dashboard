@@ -65,7 +65,7 @@ jobs:
           test -n "$GITHUB_CLIENT_SECRET" || { echo 'Missing MCP_GITHUB_CLIENT_SECRET Actions secret' >&2; exit 1; }
           printf -v client_id_q '%q' "$GITHUB_CLIENT_ID"
           printf -v client_secret_q '%q' "$GITHUB_CLIENT_SECRET"
-          ssh dokku@mcp.brewbytes.dev "config:set --no-restart dokku-mcp GITHUB_CLIENT_ID=$client_id_q GITHUB_CLIENT_SECRET=$client_secret_q"
+          ssh dokku@mcp.brewbytes.dev "config:set --no-restart dokku-mcp GITHUB_CLIENT_ID=$client_id_q GITHUB_CLIENT_SECRET=$client_secret_q" >/dev/null
 
       - name: Deploy Dokku MCP app
         run: |
