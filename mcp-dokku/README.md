@@ -6,7 +6,9 @@ Root commands can read every secret and file on the host. Command output is retu
 
 ## Runtime configuration
 
-Create a GitHub OAuth App with homepage `https://mcp.brewbytes.dev` and callback `https://mcp.brewbytes.dev/auth/callback`. Configure its client ID and secret in the Dokku app along with a stable random `JWT_SIGNING_KEY`. Request only the `read:user` scope.
+Create a GitHub OAuth App with homepage `https://mcp.brewbytes.dev` and callback `https://mcp.brewbytes.dev/auth/callback`. Request only the `read:user` scope, then add its client ID and secret as repository Actions secrets named `MCP_GITHUB_CLIENT_ID` and `MCP_GITHUB_CLIENT_SECRET`.
+
+The deploy workflow applies those credentials to Dokku before each deployment. `JWT_SIGNING_KEY` is generated once on the server during initial setup.
 
 The Dokku app also needs a read-only mount of a dedicated SSH private key at `/run/secrets/dokku/id_ed25519`. Install its public key in root's `authorized_keys` with `restrict` so SSH forwarding and PTY access stay disabled while remote commands remain available. The MCP container has no Docker socket or Dokku host-directory mounts.
 

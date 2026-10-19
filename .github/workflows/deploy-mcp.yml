@@ -56,6 +56,17 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' 'mcp.brewbytes.dev ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAJUx2FGUCtTXW4LwMxKMJzXsgmBiDZYuFJ6/uismRdC' > ~/.ssh/known_hosts
 
+      - name: Configure GitHub OAuth
+        env:
+          GITHUB_CLIENT_ID: ${{ secrets.MCP_GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ secrets.MCP_GITHUB_CLIENT_SECRET }}
+        run: |
+          test -n "$GITHUB_CLIENT_ID" || { echo 'Missing MCP_GITHUB_CLIENT_ID Actions secret' >&2; exit 1; }
+          test -n "$GITHUB_CLIENT_SECRET" || { echo 'Missing MCP_GITHUB_CLIENT_SECRET Actions secret' >&2; exit 1; }
+          printf -v client_id_q '%q' "$GITHUB_CLIENT_ID"
+          printf -v client_secret_q '%q' "$GITHUB_CLIENT_SECRET"
+          ssh dokku@mcp.brewbytes.dev "config:set --no-restart dokku-mcp GITHUB_CLIENT_ID=$client_id_q GITHUB_CLIENT_SECRET=$client_secret_q"
+
       - name: Deploy Dokku MCP app
         run: |
           git remote add dokku "dokku@mcp.brewbytes.dev:dokku-mcp"
