@@ -21,6 +21,9 @@ auth = GitHubProvider(
     required_scopes=["read:user"],
     base_url=f"https://{HOST}",
     jwt_signing_key=JWT_SIGNING_KEY,
+    # ChatGPT currently advertises a CIMD URL that returns 404.  Use FastMCP's
+    # DCR endpoint instead so ChatGPT receives a registered client ID.
+    enable_cimd=False,
 )
 
 mcp = FastMCP("Dokku root shell", auth=auth)
